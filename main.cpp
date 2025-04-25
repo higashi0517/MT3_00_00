@@ -3,7 +3,7 @@
 #include<assert.h>
 #include <cmath>
 
-const char kWindowTitle[] = "LE2C_23_ヒガシ_サチエ_00_04";
+const char kWindowTitle[] = "LE2C_23_ヒガシ_サチエ_00_05";
 
 static const int kColumnWidth = 60;
 static const int kRowHeight = 20;
@@ -122,6 +122,21 @@ Matrix4x4 Multiply(const Matrix4x4& m1, const Matrix4x4& m2) {
 	return result;
 }
 
+// 3次元アフィン変換行列
+Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate) {
+
+	Matrix4x4 translateMatrix = MakeTranslateMatrix(translate);
+	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
+	Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
+	Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
+	Matrix4x4 scaleMatrix = MakeScaleMatrix(scale);
+	Matrix4x4 rotateXYZMatrix = Multiply(rotateXMatrix, Multiply(rotateYMatrix, rotateZMatrix));
+
+	Matrix4x4 result = Multiply(scaleMatrix, rotateXYZMatrix);
+	result = Multiply(result, translateMatrix);
+	return result;
+}
+
 void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix, const char* label) {
 
 	Novice::ScreenPrintf(x, y - kRowHeight, "%s", label);
@@ -153,11 +168,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
+	Vector3 scale{ 1.2f, 0.79f, -2.1f };
 	Vector3 rotate{ 0.4f, 1.43f, -0.8f };
-	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
-	Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
-	Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
-	Matrix4x4 rotateXYZMatrix = Multiply(rotateXMatrix, Multiply(rotateYMatrix, rotateZMatrix));
+	Vector3 translate{ 2.7f, -4.15f, 1.57f };
+	Matrix4x4 worldMatrix = MakeAffineMatrix(scale, rotate, translate);
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -180,10 +194,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		MatrixScreenPrintf(0, 20, rotateXMatrix, "rotateXMatrix");
-		MatrixScreenPrintf(0, kRowHeight * 5 + 20, rotateYMatrix, "rotateYMatrix");
-		MatrixScreenPrintf(0, kRowHeight * 10 + 20, rotateZMatrix, "rotateZMatrix");
-		MatrixScreenPrintf(0, kRowHeight * 15 + 20, rotateXYZMatrix, "rotateXYZMatrix");
+		MatrixScreenPrintf(0, 20, worldMatrix, "WorldMatrix");
 
 		///
 		/// ↑描画処理ここまで
