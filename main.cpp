@@ -2,7 +2,7 @@
 #include <math.h>
 #include<assert.h>
 
-const char kWindowTitle[] = "LE2C_23_ヒガシ_サチエ_00_02";
+const char kWindowTitle[] = "LE2C_23_ヒガシ_サチエ_00_03";
 
 static const int kColumnWidth = 60;
 static const int kRowHeight = 20;
