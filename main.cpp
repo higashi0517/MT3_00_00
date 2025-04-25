@@ -1,5 +1,6 @@
 #include <Novice.h>
 #include <math.h>
+#include<assert.h>
 
 const char kWindowTitle[] = "LE2C_23_ヒガシ_サチエ_00_02";
 
@@ -12,144 +13,11 @@ typedef struct Matrix4x4 {
 
 } Matrix4x4;
 
-// 加算
-Matrix4x4 Add(const Matrix4x4& m1, const Matrix4x4& m2) {
-
-	Matrix4x4 result;
-
-	for (int i = 0; i < 4; i++) {
-
-		for (int j = 0; j < 4; j++) {
-
-			result.m[i][j] = m1.m[i][j] + m2.m[i][j];
-		}
-	}
-	return result;
-}
-
-// 減算
-Matrix4x4 Subtract(const Matrix4x4& m1, const Matrix4x4& m2) {
-
-	Matrix4x4 result;
-
-	for (int i = 0; i < 4; i++) {
-
-		for (int j = 0; j < 4; j++) {
-
-			result.m[i][j] = m1.m[i][j] - m2.m[i][j];
-		}
-	}
-	return result;
-}
-
-// 行列の積
-Matrix4x4 Multiply(const Matrix4x4& m1, const Matrix4x4& m2) {
-
-	Matrix4x4 result;
-
-	for (int i = 0; i < 4; i++) {
-
-		for (int j = 0; j < 4; j++) {
-
-			result.m[i][j] = 0.0f;
-
-			for (int k = 0; k < 4; k++) {
-
-				result.m[i][j] += m1.m[i][k] * m2.m[k][j];
-			}
-		}
-	}
-	return result;
-}
-
-// 逆行列を求める関数
-Matrix4x4 Inverse(const Matrix4x4& m) {
-	Matrix4x4 result{}; // 最後に返す逆行列
-	float det = 0.0f;   // 行列式
-
-	// --- 行列式を計算 ---
-	{
-		float sign = 1.0f;
-		for (int i = 0; i < 4; i++) {
-			// 小行列を作る
-			float subm[3][3];
-			int subi = 0;
-			for (int row = 1; row < 4; row++) { // 1行目以外
-				int subj = 0;
-				for (int col = 0; col < 4; col++) {
-					if (col == i) continue;
-					subm[subi][subj] = m.m[row][col];
-					subj++;
-				}
-				subi++;
-			}
-
-			// 小行列の行列式を求める
-			float subdet =
-				subm[0][0] * (subm[1][1] * subm[2][2] - subm[1][2] * subm[2][1]) -
-				subm[0][1] * (subm[1][0] * subm[2][2] - subm[1][2] * subm[2][0]) +
-				subm[0][2] * (subm[1][0] * subm[2][1] - subm[1][1] * subm[2][0]);
-
-			// 交互に符号をつけて合計
-			det += sign * m.m[0][i] * subdet;
-			sign = -sign;
-		}
-	}
-
-	// --- 行列式が0なら逆行列は存在しない ---
-	if (det == 0.0f) {
-		return result; // 全部0の行列を返す
-	}
-
-	// --- 余因子行列を作って、転置して、行列式で割る ---
-	for (int row = 0; row < 4; row++) {
-		for (int col = 0; col < 4; col++) {
-
-			// 小行列を作る
-			float subm[3][3];
-			int subi = 0;
-			for (int i = 0; i < 4; i++) {
-				if (i == row) continue; // row行目はスキップ
-				int subj = 0;
-				for (int j = 0; j < 4; j++) {
-					if (j == col) continue; // col列目はスキップ
-					subm[subi][subj] = m.m[i][j];
-					subj++;
-				}
-				subi++;
-			}
-
-			// 小行列の行列式を求める
-			float subdet =
-				subm[0][0] * (subm[1][1] * subm[2][2] - subm[1][2] * subm[2][1]) -
-				subm[0][1] * (subm[1][0] * subm[2][2] - subm[1][2] * subm[2][0]) +
-				subm[0][2] * (subm[1][0] * subm[2][1] - subm[1][1] * subm[2][0]);
-
-			// 符号を決める（チェス盤パターン）
-			float sign = ((row + col) % 2 == 0) ? 1.0f : -1.0f;
-
-			// 転置して代入（colとrowを逆にする）
-			result.m[col][row] = (sign * subdet) / det;
-		}
-	}
-
-	return result;
-}
-
-// 転置行列
-Matrix4x4 Transpose(const Matrix4x4& m) {
-
-	Matrix4x4 result;
-
-	for (int i = 0; i < 4; i++) {
-
-		for (int j = 0; j < 4; j++) {
-
-			result.m[i][j] = m.m[j][i];
-		}
-	}
-	return result;
-}
+typedef struct Vector3 {
+	float x;
+	float y;
+	float z;
+}Vector3;
 
 // 単位行列の作成
 Matrix4x4 MakeIdentity4x4x() {
@@ -171,7 +39,9 @@ Matrix4x4 MakeIdentity4x4x() {
 	return result;
 }
 
-void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix) {
+void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix, const char* label) {
+
+	Novice::ScreenPrintf(x, y - kRowHeight, "%s", label);
 
 	for (int row = 0; row < 4; ++row) {
 
@@ -181,6 +51,46 @@ void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix) {
 				x + column * kColumnWidth, y + row * kRowHeight, "%6.02f", matrix.m[row][column]);
 		}
 	}
+}
+
+void Vector3ScreenPrintf(int x, int y, const Vector3& vector, const char* label) {
+	Novice::ScreenPrintf(x + kColumnWidth * 4, y, "%s", label);
+	Novice::ScreenPrintf(x, y, "%6.02f", vector.x);
+	Novice::ScreenPrintf(x + kColumnWidth, y, "%6.02f", vector.y);
+	Novice::ScreenPrintf(x + kColumnWidth * 2, y, "%6.02f", vector.z);
+}
+
+
+// 平行移動行列
+Matrix4x4 MakeTranslateMatrix(const Vector3& translate) {
+	Matrix4x4 result = MakeIdentity4x4x();
+	result.m[3][0] = translate.x;
+	result.m[3][1] = translate.y;
+	result.m[3][2] = translate.z;
+	return result;
+}
+
+// 拡大縮小行列
+Matrix4x4 MakeScaleMatrix(const Vector3& scale) {
+	Matrix4x4 result = MakeIdentity4x4x();
+	result.m[0][0] = scale.x;
+	result.m[1][1] = scale.y;
+	result.m[2][2] = scale.z;
+	return result;
+}
+
+// 同次座標
+Vector3 Transform(const Vector3& vector, const Matrix4x4& matrix) {
+	Vector3 result;
+	result.x = vector.x * matrix.m[0][0] + vector.y * matrix.m[1][0] + vector.z * matrix.m[2][0] + matrix.m[3][0];
+	result.y = vector.x * matrix.m[0][1] + vector.y * matrix.m[1][1] + vector.z * matrix.m[2][1] + matrix.m[3][1];
+	result.z = vector.x * matrix.m[0][2] + vector.y * matrix.m[1][2] + vector.z * matrix.m[2][2] + matrix.m[3][2];
+	float w = vector.x * matrix.m[0][3] + vector.y * matrix.m[1][3] + vector.z * matrix.m[2][3] + matrix.m[3][3];
+	assert(w != 0.0f);
+	result.x /= w;
+	result.y /= w;
+	result.z /= w;
+	return result;
 }
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -193,22 +103,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
-	Matrix4x4 m1 = {
+	Vector3 translate = { 4.1f,2.6f,0.8f };
+	Vector3 scale = { 1.5f,5.2f,7.3f };
 
-		3.2f, 0.7f, 9.6f, 4.4f,
-		5.5f, 1.3f, 7.8f, 2.1f,
-		6.9f, 8.0f, 2.6f, 1.0f,
-		0.5f, 7.2f, 5.1f, 3.3f
+	Matrix4x4 translateMatrix = MakeTranslateMatrix(translate);
+	Matrix4x4 scaleMatrix = MakeScaleMatrix(scale);
+
+	Vector3 point = { 2.3f, 3.8f, 1.4f };
+
+	Matrix4x4 transformMatrix = {
+
+		1.0f, 2.0f, 3.0f, 4.0f,
+		3.0f, 1.0f, 1.0f, 2.0f,
+		1.0f, 4.0f, 2.0f, 3.0f,
+		2.0f, 2.0f, 1.0f, 3.0f,
 	};
 
-	Matrix4x4 m2 = {
-
-		4.1f, 6.5f, 3.3f, 2.2f,
-		8.8f, 0.6f, 9.9f, 7.7f,
-		1.1f, 5.5f, 6.6f, 0.0f,
-		3.3f, 9.9f, 8.8f, 2.2f
-	};
-
+	Vector3 transformed = Transform(point, transformMatrix);
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -223,15 +134,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓更新処理ここから
 		///
 
-		Matrix4x4 resultAdd = Add(m1, m2);
-		Matrix4x4 resultMultiply = Multiply(m1, m2);
-		Matrix4x4 resultSubtract = Subtract(m1, m2);
-		Matrix4x4 inverseM1 = Inverse(m1);
-		Matrix4x4 inverseM2 = Inverse(m2);
-		Matrix4x4 itransposeM1 = Transpose(m1);
-		Matrix4x4 itransposeM2 = Transpose(m2);
-		Matrix4x4 identity = MakeIdentity4x4x();
-
 		///
 		/// ↑更新処理ここまで
 		///
@@ -240,29 +142,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		Novice::ScreenPrintf(0, 0, "Add");
-		MatrixScreenPrintf(0, 20, resultAdd);
-
-		Novice::ScreenPrintf(0, kRowHeight * 5, "Subtract");
-		MatrixScreenPrintf(0, kRowHeight * 5 + 20, resultSubtract);
-
-		Novice::ScreenPrintf(0, kRowHeight * 5 * 2, "Multiply");
-		MatrixScreenPrintf(0, kRowHeight * 5 * 2 + 20, resultMultiply);
-
-		Novice::ScreenPrintf(0, kRowHeight * 5 * 3, "InverseM1");
-		MatrixScreenPrintf(0, kRowHeight * 5 * 3 + 20, inverseM1);
-
-		Novice::ScreenPrintf(0, kRowHeight * 5 * 4, "InverseM2");
-		MatrixScreenPrintf(0, kRowHeight * 5 * 4 + 20, inverseM2);
-
-		Novice::ScreenPrintf(kColumnWidth * 5, 0, "TransposeM1");
-		MatrixScreenPrintf(kColumnWidth * 5, 20, itransposeM1);
-
-		Novice::ScreenPrintf(kColumnWidth * 5, kRowHeight * 5, "TransposeM2");
-		MatrixScreenPrintf(kColumnWidth * 5, kRowHeight * 5 + 20, itransposeM2);
-
-		Novice::ScreenPrintf(kColumnWidth * 5, kRowHeight * 5 * 2, "Identity");
-		MatrixScreenPrintf(kColumnWidth * 5, kRowHeight * 5 * 2 + 20, identity);
+		Vector3ScreenPrintf(0, 0, transformed, "transformed");
+		MatrixScreenPrintf(0, 40, translateMatrix, "translateMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 7, scaleMatrix, "scaleMatrix");
 
 		///
 		/// ↑描画処理ここまで
