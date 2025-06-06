@@ -430,8 +430,8 @@ void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, con
 Vector3 Project(const Vector3& v1, const Vector3& v2) {
 
 	float dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z; // 内積
-	float lengthSquared = v2.x * v2.x + v2.y * v2.y + v2.z * v2.z; // ベクトルの長さの二乗
-	float scale = dot / lengthSquared; // スケール係数
+	float lengthSquared = v2.x * v2.x + v2.y * v2.y + v2.z * v2.z;
+	float scale = dot / lengthSquared;
 
 	Vector3 result;
 	result.x = v2.x * scale;
@@ -446,11 +446,11 @@ Vector3 ClosestPoint(const Vector3& point, const Segment& segment) {
 	float t = (segmentToPoint.x * segment.diff.x + segmentToPoint.y * segment.diff.y + segmentToPoint.z * segment.diff.z) /
 		(segment.diff.x * segment.diff.x + segment.diff.y * segment.diff.y + segment.diff.z * segment.diff.z);
 	if (t < 0.0f) {
-		return segment.origin; // セグメントの始点が最も近い
+		return segment.origin;
 	} else if (t > 1.0f) {
-		return { segment.origin.x + segment.diff.x, segment.origin.y + segment.diff.y, segment.origin.z + segment.diff.z }; // セグメントの終点が最も近い
+		return { segment.origin.x + segment.diff.x, segment.origin.y + segment.diff.y, segment.origin.z + segment.diff.z };
 	} else {
-		return { segment.origin.x + segment.diff.x * t, segment.origin.y + segment.diff.y * t, segment.origin.z + segment.diff.z * t }; // セグメント上の点
+		return { segment.origin.x + segment.diff.x * t, segment.origin.y + segment.diff.y * t, segment.origin.z + segment.diff.z * t };
 	}
 }
 
@@ -470,6 +470,13 @@ Vector3 Add(const Vector3& v1, const Vector3& v2) {
 	return result;
 }
 
+bool IsCollision(const Sphere& s1, const Sphere& s2) {
+	Vector3 diff = Subtract(s1.center, s2.center);
+	float distanceSquared = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+	float radiusSum = s1.radius + s2.radius;
+	return distanceSquared <= radiusSum * radiusSum;
+}
+
 // Windowsアプリでのエントリーイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
@@ -482,11 +489,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Vector3 cameraTranslate{ 0.0f,1.9f,-6.49f };
 	Vector3 cameraRotate{ 0.26f,0.0f,0.0f };
-	Sphere sphere = { {0.0f, 1.0f, 0.0f}, 1.0f }; // 位置:原点上, 半径:1.0
-
-	Segment segment{ {-2.0f, -1.0f, 0.0f}, {3.0f, 2.0f, 2.0f} };
-	Vector3 point{ -1.5f,0.6f,0.6f };
-
+	Sphere sphere = { {0.0f, 0.0f, 0.0f}, 0.6f }; // 位置:原点上, 半径:1.0
+	Sphere sphere2 = { {1.0f, 0.0f, 0.0f}, 0.3f }; // 位置:原点上, 半径:1.0
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -509,15 +513,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 		Matrix4x4 viewportMatrix = MakeViewportMatrix(
 			0.0f, 0.0f, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
-		
-		Vector3 project = Project(Subtract(point, segment.origin), segment.diff);
-		Vector3 closestpoint = ClosestPoint(point, segment);
-
-		Sphere pointSphere{ point,0.01f };
-		Sphere closestPointSphere{ closestpoint,0.01f };
-
-		Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
-		Vector3 end = Transform(Transform(Add(segment.origin, segment.diff), viewProjectionMatrix), viewportMatrix);
 
 		///
 		/// ↑更新処理ここまで
@@ -529,17 +524,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		// ImGui
 		ImGui::Begin("Window");
-		ImGui::InputFloat3("Point", &point.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-		ImGui::InputFloat3("Segment Origin", &segment.origin.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-		ImGui::InputFloat3("Segment Diff", &segment.diff.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
-		ImGui::InputFloat3("Project", &project.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+		ImGui::DragFloat3("sphere.center", &sphere.center.x, 0.01f);
+		ImGui::DragFloat("sphere.radius", &sphere.radius, 0.01f);
+		ImGui::DragFloat3("sphere2.center", &sphere2.center.x, 0.01f);
+		ImGui::DragFloat("sphere2.radius", &sphere2.radius, 0.01f);
 		ImGui::End();
 
 		// 描画
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
-		DrawSphere(pointSphere, viewProjectionMatrix, viewportMatrix, RED);
-		DrawSphere(closestPointSphere, viewProjectionMatrix, viewportMatrix, BLACK);
-		Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), WHITE);
+
+		if (IsCollision(sphere, sphere2)) {
+
+			DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, RED);
+			DrawSphere(sphere2, viewProjectionMatrix, viewportMatrix, WHITE);
+		} else {
+
+			DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, WHITE);
+			DrawSphere(sphere2, viewProjectionMatrix, viewportMatrix, WHITE);
+		}
 
 		///
 		/// ↑描画処理ここまで
