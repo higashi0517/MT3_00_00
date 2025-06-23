@@ -5,7 +5,7 @@
 #include <cmath>
 #include <imgui.h>
 
-const char kWindowTitle[] = "LE2C_23_ヒガシ_サチエ_00_05";
+const char kWindowTitle[] = "LE2C_23_ヒガシ_サチエ_02_03";
 
 static const int kColumnWidth = 60;
 static const int kRowHeight = 20;
@@ -13,33 +13,38 @@ static const int kWindowWidth = 1280;
 static const int kWindowHeight = 720;
 const float pi = 3.1415926535f;
 
-typedef struct Matrix4x4 {
+struct Matrix4x4 {
 
 	float m[4][4];
 
-} Matrix4x4;
+};
 
-typedef struct Vector3 {
+struct Vector3 {
 
 	float x;
 	float y;
 	float z;
 
-}Vector3;
+};
 
-typedef struct Sphere {
+struct Sphere {
 
 	Vector3 center;
 	float radius;
 
-} Sphere;
+};
 
-typedef struct Segment {
+struct Segment {
 
 	Vector3 origin;
 	Vector3 diff;
 
-}Segment;
+};
+
+struct Plane {
+	Vector3 normal;
+	float distance;
+};
 
 // 単位行列の作成
 Matrix4x4 MakeIdentity4x4() {
@@ -470,11 +475,69 @@ Vector3 Add(const Vector3& v1, const Vector3& v2) {
 	return result;
 }
 
-bool IsCollision(const Sphere& s1, const Sphere& s2) {
-	Vector3 diff = Subtract(s1.center, s2.center);
-	float distanceSquared = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
-	float radiusSum = s1.radius + s2.radius;
-	return distanceSquared <= radiusSum * radiusSum;
+//bool IsCollision(const Sphere& s1, const Sphere& s2) {
+//	Vector3 diff = Subtract(s1.center, s2.center);
+//	float distanceSquared = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+//	float radiusSum = s1.radius + s2.radius;
+//	return distanceSquared <= radiusSum * radiusSum;
+//}
+
+bool IsCollision(const Sphere& sphere, const Plane& plane) {
+
+	// 球の中心から平面までの距離を計算
+	float distance = sphere.center.x * plane.normal.x +
+		sphere.center.y * plane.normal.y +
+		sphere.center.z * plane.normal.z -
+		plane.distance;
+	// 距離が球の半径以下なら衝突している
+	return std::abs(distance) <= sphere.radius;
+}
+
+Vector3 Perpendicular(const Vector3& vector) {
+	if (vector.x != 0.0f || vector.y != 0.0f) {
+		return{ -vector.y, vector.x, 0.0f };
+	}
+	return{ 0.0f, -vector.z, vector.y };
+}
+
+Vector3 Multiply(float scalar, const Vector3& vector) {
+	Vector3 result;
+	result.x = scalar * vector.x;
+	result.y = scalar * vector.y;
+	result.z = scalar * vector.z;
+	return result;
+}
+
+// 正規化	
+Vector3 Normalize(const Vector3& vector) {
+	float length = std::sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+	if (length == 0.0f) {
+		return { 0.0f, 0.0f, 0.0f };
+	}
+	return { vector.x / length, vector.y / length, vector.z / length };
+}
+
+// 平面を描画する関数
+void DrawPlane(const Plane& plane, const Matrix4x4& vpm, const Matrix4x4& vm, uint32_t color) {
+
+	Vector3 center = Multiply(plane.distance, plane.normal);
+	Vector3 perpendiculars[4];
+	perpendiculars[0] = Normalize(Perpendicular(plane.normal));
+	perpendiculars[1] = { -perpendiculars[0].x,-perpendiculars[0].y, -perpendiculars[0].z };
+	perpendiculars[2] = Cross(plane.normal, perpendiculars[0]);
+	perpendiculars[3] = { -perpendiculars[2].x, -perpendiculars[2].y, -perpendiculars[2].z };
+
+	Vector3 points[4];
+	for (int32_t index = 0; index < 4; index++) {
+		Vector3 extend = Multiply(2.0f, perpendiculars[index]);
+		Vector3 point = Add(center, extend);
+		points[index] = Transform(Transform(point, vpm), vm);
+	}
+
+	Novice::DrawLine(int(points[0].x), int(points[0].y), int(points[2].x), int(points[2].y), color);
+	Novice::DrawLine(int(points[1].x), int(points[1].y), int(points[2].x), int(points[2].y), color);
+	Novice::DrawLine(int(points[1].x), int(points[1].y), int(points[3].x), int(points[3].y), color);
+	Novice::DrawLine(int(points[3].x), int(points[3].y), int(points[0].x), int(points[0].y), color);
 }
 
 // Windowsアプリでのエントリーイント(main関数)
@@ -490,7 +553,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Vector3 cameraTranslate{ 0.0f,1.9f,-6.49f };
 	Vector3 cameraRotate{ 0.26f,0.0f,0.0f };
 	Sphere sphere = { {0.0f, 0.0f, 0.0f}, 0.6f }; // 位置:原点上, 半径:1.0
-	Sphere sphere2 = { {1.0f, 0.0f, 0.0f}, 0.3f }; // 位置:原点上, 半径:1.0
+	Plane plane = { {0.0f, 1.0f, 0.0f}, 0.0f }; // 平面の法線ベクトルと距離
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -526,21 +589,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("sphere.center", &sphere.center.x, 0.01f);
 		ImGui::DragFloat("sphere.radius", &sphere.radius, 0.01f);
-		ImGui::DragFloat3("sphere2.center", &sphere2.center.x, 0.01f);
-		ImGui::DragFloat("sphere2.radius", &sphere2.radius, 0.01f);
+		ImGui::DragFloat3("plane.normal", &plane.normal.x, 0.01f);
+		ImGui::DragFloat("plane.distance", &plane.distance, 0.01f);
 		ImGui::End();
 
 		// 描画
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		if (IsCollision(sphere, sphere2)) {
+		if (IsCollision(sphere, plane)) {
 
 			DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, RED);
-			DrawSphere(sphere2, viewProjectionMatrix, viewportMatrix, WHITE);
+			DrawPlane(plane, viewProjectionMatrix, viewportMatrix, WHITE);
 		} else {
 
 			DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, WHITE);
-			DrawSphere(sphere2, viewProjectionMatrix, viewportMatrix, WHITE);
+			DrawPlane(plane, viewProjectionMatrix, viewportMatrix, WHITE);
 		}
 
 		///
