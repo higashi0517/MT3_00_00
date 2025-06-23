@@ -475,24 +475,6 @@ Vector3 Add(const Vector3& v1, const Vector3& v2) {
 	return result;
 }
 
-//bool IsCollision(const Sphere& s1, const Sphere& s2) {
-//	Vector3 diff = Subtract(s1.center, s2.center);
-//	float distanceSquared = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
-//	float radiusSum = s1.radius + s2.radius;
-//	return distanceSquared <= radiusSum * radiusSum;
-//}
-
-bool IsCollision(const Sphere& sphere, const Plane& plane) {
-
-	// 球の中心から平面までの距離を計算
-	float distance = sphere.center.x * plane.normal.x +
-		sphere.center.y * plane.normal.y +
-		sphere.center.z * plane.normal.z -
-		plane.distance;
-	// 距離が球の半径以下なら衝突している
-	return std::abs(distance) <= sphere.radius;
-}
-
 Vector3 Perpendicular(const Vector3& vector) {
 	if (vector.x != 0.0f || vector.y != 0.0f) {
 		return{ -vector.y, vector.x, 0.0f };
@@ -506,6 +488,29 @@ Vector3 Multiply(float scalar, const Vector3& vector) {
 	result.y = scalar * vector.y;
 	result.z = scalar * vector.z;
 	return result;
+}
+
+// Dot積を計算する関数
+float Dot(const Vector3& v1, const Vector3& v2) {
+	return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+}
+
+bool IsCollision(const Segment& segment, const Plane& plane) {
+	
+	float dot = Dot(plane.normal, segment.diff);
+
+	if(dot==0.0f) {
+		return false;
+	}
+
+	float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
+
+	// tが0以上1以下なら衝突している
+	if (t >= 0.0f && t <= 1.0f) {
+		return true;
+	}
+
+	return false;
 }
 
 // 正規化	
@@ -552,8 +557,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Vector3 cameraTranslate{ 0.0f,1.9f,-6.49f };
 	Vector3 cameraRotate{ 0.26f,0.0f,0.0f };
-	Sphere sphere = { {0.0f, 0.0f, 0.0f}, 0.6f }; // 位置:原点上, 半径:1.0
-	Plane plane = { {0.0f, 1.0f, 0.0f}, 0.0f }; // 平面の法線ベクトルと距離
+	Plane plane = { {1.0f, 1.0f, 0.0f}, 0.0f };
+	Segment segment = { {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f} };
+
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -577,6 +583,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Matrix4x4 viewportMatrix = MakeViewportMatrix(
 			0.0f, 0.0f, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
+		// 線分のスクリーン座標変換
+		Vector3 start = Transform(segment.origin, viewProjectionMatrix);
+		start = Transform(start, viewportMatrix);
+
+		Vector3 end = Add(segment.origin, segment.diff);
+		end = Transform(end, viewProjectionMatrix);
+		end = Transform(end, viewportMatrix);
+
 		///
 		/// ↑更新処理ここまで
 		///
@@ -587,22 +601,28 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		// ImGui
 		ImGui::Begin("Window");
-		ImGui::DragFloat3("sphere.center", &sphere.center.x, 0.01f);
-		ImGui::DragFloat("sphere.radius", &sphere.radius, 0.01f);
 		ImGui::DragFloat3("plane.normal", &plane.normal.x, 0.01f);
 		ImGui::DragFloat("plane.distance", &plane.distance, 0.01f);
+		ImGui::DragFloat3("segment.origin", &segment.origin.x, 0.01f);
+		ImGui::DragFloat3("segment.diff", &segment.diff.x, 0.01f);
 		ImGui::End();
 
 		// 描画
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		if (IsCollision(sphere, plane)) {
+		if (IsCollision(segment, plane)) {
 
-			DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, RED);
+			Novice::DrawLine(
+				int(start.x), int(start.y),
+				int(end.x), int(end.y),
+				RED);
 			DrawPlane(plane, viewProjectionMatrix, viewportMatrix, WHITE);
 		} else {
 
-			DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, WHITE);
+			Novice::DrawLine(
+				int(start.x), int(start.y),
+				int(end.x), int(end.y),
+				WHITE);
 			DrawPlane(plane, viewProjectionMatrix, viewportMatrix, WHITE);
 		}
 
