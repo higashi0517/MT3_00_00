@@ -4,6 +4,7 @@
 #include<assert.h>
 #include <cmath>
 #include <imgui.h>
+#include <algorithm>
 
 const char kWindowTitle[] = "LE2C_23_ヒガシ_サチエ_02_03";
 
@@ -516,6 +517,10 @@ Vector3 operator*(float s, const Vector3& v) {
 Vector3 operator+(const Vector3& a, const Vector3& b) {
 	return { a.x + b.x, a.y + b.y, a.z + b.z };
 }
+// 減算演算子
+Vector3 operator-(const Vector3& a, const Vector3& b) {
+	return { a.x - b.x, a.y - b.y, a.z - b.z };
+}
 
 // 正規化	
 Vector3 Normalize(const Vector3& vector) {
@@ -524,6 +529,11 @@ Vector3 Normalize(const Vector3& vector) {
 		return { 0.0f, 0.0f, 0.0f };
 	}
 	return { vector.x / length, vector.y / length, vector.z / length };
+}
+
+// 長さを計算する関数
+float Length(const Vector3& vector) {
+	return std::sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
 }
 
 // 平面を描画する関数
@@ -549,11 +559,26 @@ void DrawPlane(const Plane& plane, const Matrix4x4& vpm, const Matrix4x4& vm, ui
 	Novice::DrawLine(int(points[3].x), int(points[3].y), int(points[0].x), int(points[0].y), color);
 }
 
-bool IsCollision(const AABB& aabb1, const AABB& aabb2) {
+bool IsCollision(const AABB& aabb,const Sphere& sphere) {
 
-	return (aabb1.min.x <= aabb2.max.x && aabb1.max.x >= aabb2.min.x) &&
-		(aabb1.min.y <= aabb2.max.y && aabb1.max.y >= aabb2.min.y) &&
-		(aabb1.min.z <= aabb2.max.z && aabb1.max.z >= aabb2.min.z);
+	float minX = (std::min)(aabb.min.x, aabb.max.x);
+	float maxX = (std::max)(aabb.min.x, aabb.max.x);
+	float minY = (std::min)(aabb.min.y, aabb.max.y);
+	float maxY = (std::max)(aabb.min.y, aabb.max.y);
+	float minZ = (std::min)(aabb.min.z, aabb.max.z);
+	float maxZ = (std::max)(aabb.min.z, aabb.max.z);
+
+	// 最近接点
+	Vector3 closestPoint{
+	   std::clamp(sphere.center.x, minX, maxX),
+	   std::clamp(sphere.center.y, minY, maxY),
+	   std::clamp(sphere.center.z, minZ, maxZ)
+	};
+
+	// 最近接点ト球の中心との距離を求める
+	float distance = Length(closestPoint - sphere.center);
+	// 距離が球の半径以下なら衝突している
+	return distance <= sphere.radius;
 }
 
 void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
@@ -638,9 +663,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		.min = {0.5f, -0.5f, -0.5f},
 		.max = {0.0f, 0.0f, 0.0f},
 	};
-	AABB aabb2{
-		.min = {0.2f, 0.2f, 0.2f},
-		.max = {1.0f, 1.0f, 1.0f},
+	Sphere sphere{
+		.center = { 0.0f, 0.0f, 0.0f },
+		.radius = 1.0f
 	};
 
 	// ウィンドウの×ボタンが押されるまでループ
@@ -666,16 +691,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Matrix4x4 viewportMatrix = MakeViewportMatrix(
 			0.0f, 0.0f, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
-
-
-		//// 線分のスクリーン座標変換
-		//Vector3 start = Transform(segment.origin, viewProjectionMatrix);
-		//start = Transform(start, viewportMatrix);
-
-		//Vector3 end = Add(segment.origin, segment.diff);
-		//end = Transform(end, viewProjectionMatrix);
-		//end = Transform(end, viewportMatrix);
-
 		///
 		/// ↑更新処理ここまで
 		///
@@ -690,24 +705,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		// カメラの設定
 		ImGui::DragFloat3("cameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("cameraRotate", &cameraRotate.x, 0.01f);
-		
+
 		// aabb1の設定
 		ImGui::DragFloat3("AABB1 Min", &aabb1.min.x, 0.01f);
 		ImGui::DragFloat3("AABB1 Max", &aabb1.max.x, 0.01f);
-		// aabb2の設定
-		ImGui::DragFloat3("AABB2 Min", &aabb2.min.x, 0.01f);
-		ImGui::DragFloat3("AABB2 Max", &aabb2.max.x, 0.01f);
+		// sphereの設定
+		ImGui::DragFloat3("Sphere Center", &sphere.center.x, 0.01f);
+		ImGui::DragFloat("Sphere Radius", &sphere.radius, 0.01f);
 		ImGui::End();
 
 		// 描画
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		if (IsCollision(aabb1, aabb2)) {
-			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, RED); 
-			DrawAABB(aabb2, viewProjectionMatrix, viewportMatrix, WHITE); 
+		if (IsCollision(aabb1, sphere)) {
+			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, RED);
+			DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, WHITE);
 		} else {
 			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, WHITE);
-			DrawAABB(aabb2, viewProjectionMatrix, viewportMatrix, WHITE);
+			DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, WHITE);
 		}
 
 		///
