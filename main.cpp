@@ -4,6 +4,7 @@
 #include<assert.h>
 #include <cmath>
 #include <imgui.h>
+#include <algorithm>
 
 const char kWindowTitle[] = "LE2C_23_ヒガシ_サチエ_02_03";
 
@@ -551,9 +552,24 @@ void DrawPlane(const Plane& plane, const Matrix4x4& vpm, const Matrix4x4& vm, ui
 
 bool IsCollision(const AABB& aabb1, const AABB& aabb2) {
 
-	return (aabb1.min.x <= aabb2.max.x && aabb1.max.x >= aabb2.min.x) &&
-		(aabb1.min.y <= aabb2.max.y && aabb1.max.y >= aabb2.min.y) &&
-		(aabb1.min.z <= aabb2.max.z && aabb1.max.z >= aabb2.min.z);
+	float minX = (std::min)(aabb1.min.x, aabb1.max.x);
+	float maxX = (std::max)(aabb1.min.x, aabb1.max.x);
+	float minY = (std::min)(aabb1.min.y, aabb1.max.y);
+	float maxY = (std::max)(aabb1.min.y, aabb1.max.y);
+	float minZ = (std::min)(aabb1.min.z, aabb1.max.z);
+	float maxZ = (std::max)(aabb1.min.z, aabb1.max.z);
+
+	float minX2 = (std::min)(aabb2.min.x, aabb2.max.x);
+	float maxX2 = (std::max)(aabb2.min.x, aabb2.max.x);
+	float minY2 = (std::min)(aabb2.min.y, aabb2.max.y);
+	float maxY2 = (std::max)(aabb2.min.y, aabb2.max.y);
+	float minZ2 = (std::min)(aabb2.min.z, aabb2.max.z);
+	float maxZ2 = (std::max)(aabb2.min.z, aabb2.max.z);
+
+	return 
+		(maxX >= minX2 && minX <= maxX2) &&
+		(maxY >= minY2 && minY <= maxY2) &&
+		(maxZ >= minZ2 && minZ <= maxZ2);
 }
 
 void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
@@ -665,16 +681,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 		Matrix4x4 viewportMatrix = MakeViewportMatrix(
 			0.0f, 0.0f, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
-
-
-
-		//// 線分のスクリーン座標変換
-		//Vector3 start = Transform(segment.origin, viewProjectionMatrix);
-		//start = Transform(start, viewportMatrix);
-
-		//Vector3 end = Add(segment.origin, segment.diff);
-		//end = Transform(end, viewProjectionMatrix);
-		//end = Transform(end, viewportMatrix);
 
 		///
 		/// ↑更新処理ここまで
