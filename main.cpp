@@ -550,7 +550,7 @@ void DrawPlane(const Plane& plane, const Matrix4x4& vpm, const Matrix4x4& vm, ui
 	Novice::DrawLine(int(points[3].x), int(points[3].y), int(points[0].x), int(points[0].y), color);
 }
 
-bool IsCollision(const AABB& aabb1, const AABB& aabb2) {
+bool IsCollision(const AABB& aabb1, const Segment segment) {
 
 	float minX = (std::min)(aabb1.min.x, aabb1.max.x);
 	float maxX = (std::max)(aabb1.min.x, aabb1.max.x);
@@ -559,17 +559,29 @@ bool IsCollision(const AABB& aabb1, const AABB& aabb2) {
 	float minZ = (std::min)(aabb1.min.z, aabb1.max.z);
 	float maxZ = (std::max)(aabb1.min.z, aabb1.max.z);
 
-	float minX2 = (std::min)(aabb2.min.x, aabb2.max.x);
-	float maxX2 = (std::max)(aabb2.min.x, aabb2.max.x);
-	float minY2 = (std::min)(aabb2.min.y, aabb2.max.y);
-	float maxY2 = (std::max)(aabb2.min.y, aabb2.max.y);
-	float minZ2 = (std::min)(aabb2.min.z, aabb2.max.z);
-	float maxZ2 = (std::max)(aabb2.min.z, aabb2.max.z);
+	float TXmin = (minX - segment.origin.x) / segment.diff.x;
+	float TXmax = (maxX - segment.origin.x) / segment.diff.x;
+	float TYmin = (minY - segment.origin.y) / segment.diff.y;
+	float TYmax = (maxY - segment.origin.y) / segment.diff.y;
+	float TZmin = (minZ - segment.origin.z) / segment.diff.z;
+	float TZmax = (maxZ - segment.origin.z) / segment.diff.z;
 
-	return 
-		(maxX >= minX2 && minX <= maxX2) &&
-		(maxY >= minY2 && minY <= maxY2) &&
-		(maxZ >= minZ2 && minZ <= maxZ2);
+	float tNearX = (std::min)(TXmin, TXmax);
+	float tFarX = (std::max)(TXmin, TXmax);
+	float tNearY = (std::min)(TYmin, TYmax);
+	float tFarY = (std::max)(TYmin, TYmax);
+	float tNearZ = (std::min)(TZmin, TZmax);
+	float tFarZ = (std::max)(TZmin, TZmax);
+
+	// AABBトの衝突点(貫通店)のtが小さいほう
+	float tmin = (std::max)((std::max)(tNearX, tNearY), tNearZ);
+	// AABBトの衝突点(貫通店)のtが大きいほう
+	float tmax = (std::min)((std::min)(tFarX, tFarY), tFarZ);
+	if( tmin > tmax ) {
+		return false; // 衝突していない
+	}
+
+	return true; // 衝突している
 }
 
 void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
@@ -651,12 +663,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Vector3 target{ 0.0f, 0.0f, 0.0f };
 	Vector3 up{ 0.0f, 1.0f, 0.0f };
 	AABB aabb1{
-		.min = {0.5f, -0.5f, -0.5f},
-		.max = {0.0f, 0.0f, 0.0f},
+		.min = {-0.5f, -0.5f, -0.5f},
+		.max = {0.5f, 0.5f, 0.5f},
 	};
-	AABB aabb2{
-		.min = {0.2f, 0.2f, 0.2f},
-		.max = {1.0f, 1.0f, 1.0f},
+	Segment segment{
+		.origin{-0.7f, 0.3f, 0.0f},
+		.diff{2.0f, -0.5f, 0.0f}
 	};
 
 	// ウィンドウの×ボタンが押されるまでループ
@@ -682,6 +694,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Matrix4x4 viewportMatrix = MakeViewportMatrix(
 			0.0f, 0.0f, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
+		// 線分のスクリーン座標変換
+		Vector3 start = Transform(segment.origin, viewProjectionMatrix);
+		start = Transform(start, viewportMatrix);
+
+		Vector3 end = Add(segment.origin, segment.diff);
+		end = Transform(end, viewProjectionMatrix);
+		end = Transform(end, viewportMatrix);
+
 		///
 		/// ↑更新処理ここまで
 		///
@@ -700,20 +720,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		// aabb1の設定
 		ImGui::DragFloat3("AABB1 Min", &aabb1.min.x, 0.01f);
 		ImGui::DragFloat3("AABB1 Max", &aabb1.max.x, 0.01f);
-		// aabb2の設定
-		ImGui::DragFloat3("AABB2 Min", &aabb2.min.x, 0.01f);
-		ImGui::DragFloat3("AABB2 Max", &aabb2.max.x, 0.01f);
+		
+		// セグメントの設定
+		ImGui::DragFloat3("Segment Origin", &segment.origin.x, 0.01f);
+		ImGui::DragFloat3("Segment Diff", &segment.diff.x, 0.01f);
 		ImGui::End();
 
 		// 描画
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		if (IsCollision(aabb1, aabb2)) {
+		if (IsCollision(aabb1,segment )) {
 			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, RED); 
-			DrawAABB(aabb2, viewProjectionMatrix, viewportMatrix, WHITE); 
+			Novice::DrawLine(
+				int(start.x), int(start.y),
+				int(end.x), int(end.y),
+				WHITE
+			);
 		} else {
 			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, WHITE);
-			DrawAABB(aabb2, viewProjectionMatrix, viewportMatrix, WHITE);
+			Novice::DrawLine(
+				int(start.x), int(start.y),
+				int(end.x), int(end.y),
+				WHITE
+			);
 		}
 
 		///
