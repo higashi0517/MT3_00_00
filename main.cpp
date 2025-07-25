@@ -545,6 +545,7 @@ void DrawPlane(const Plane& plane, const Matrix4x4& vpm, const Matrix4x4& vm, ui
 }
 
 bool IsCollision(const Triangle& triangle, const Segment& segment) {
+
 	// 1. 三角形の頂点
 	const Vector3& v0 = triangle.vertices[0];
 	const Vector3& v1 = triangle.vertices[1];
@@ -554,7 +555,9 @@ bool IsCollision(const Triangle& triangle, const Segment& segment) {
 	Vector3 n = Cross(Subtract(v1, v0), Subtract(v2, v0));
 
 	// 3. 線分のパラメータ表現
-	Vector3 dir = Subtract(segment.diff, segment.origin); // 線分方向ベクトル
+	Vector3 dir = segment.diff;
+
+	//Vector3 dir = Subtract(segment.diff, segment.origin); // 線分方向ベクトル
 	float denom = Dot(n, dir);
 
 	// 平行判定
@@ -579,16 +582,16 @@ bool IsCollision(const Triangle& triangle, const Segment& segment) {
 	Vector3 v1p = Subtract(p, v1);
 	Vector3 v2p = Subtract(p, v2);
 
-	Vector3 c0 = Cross(v01, v0p);
-	Vector3 c1 = Cross(v12, v1p);
-	Vector3 c2 = Cross(v20, v2p);
+	Vector3 c0 = Cross(v01, v1p);
+	Vector3 c1 = Cross(v12, v2p);
+	Vector3 c2 = Cross(v20, v0p);
 
 	if (Dot(c0, n) >= 0 && Dot(c1, n) >= 0 && Dot(c2, n) >= 0)
 		return true;
 	return false;
 }
 
-void DrawTriangle(const Triangle& triangle,const Matrix4x4& viewProjectionMatrix,const Matrix4x4& viewportMatrix, uint32_t color) {
+void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
 	// 三角形の頂点をスクリーン座標に変換
 	Vector3 screenVertices[3];
 	for (int i = 0; i < 3; ++i) {
@@ -668,7 +671,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 		Matrix4x4 viewportMatrix = MakeViewportMatrix(
 			0.0f, 0.0f, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
-		
+
 
 
 		// 線分のスクリーン座標変換
@@ -701,7 +704,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		// 描画
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		if(IsCollision(triangle, segment)) {
+		if (IsCollision(triangle, segment)) {
 			Novice::DrawLine(
 				int(start.x), int(start.y),
 				int(end.x), int(end.y),
