@@ -51,6 +51,11 @@ struct Triangle {
 	Vector3 vertices[3];
 };
 
+struct AABB {
+	Vector3 min; // 最小座標
+	Vector3 max; // 最大座標
+};
+
 // 単位行列の作成
 Matrix4x4 MakeIdentity4x4() {
 
@@ -544,51 +549,14 @@ void DrawPlane(const Plane& plane, const Matrix4x4& vpm, const Matrix4x4& vm, ui
 	Novice::DrawLine(int(points[3].x), int(points[3].y), int(points[0].x), int(points[0].y), color);
 }
 
-bool IsCollision(const Triangle& triangle, const Segment& segment) {
-	// 1. 三角形の頂点
-	const Vector3& v0 = triangle.vertices[0];
-	const Vector3& v1 = triangle.vertices[1];
-	const Vector3& v2 = triangle.vertices[2];
+bool IsCollision(const AABB& aabb1, const AABB& aabb2) {
 
-	// 2. 三角形の法線
-	Vector3 n = Cross(Subtract(v1, v0), Subtract(v2, v0));
-
-	// 3. 線分のパラメータ表現
-	Vector3 dir = Subtract(segment.diff, segment.origin); // 線分方向ベクトル
-	float denom = Dot(n, dir);
-
-	// 平行判定
-	if (fabs(denom) < 1e-6f) return false;
-
-	// 線分の始点から三角形の平面までの距離
-	float t = Dot(n, Subtract(v0, segment.origin)) / denom;
-
-	// tが0～1でなければ線分と交差しない
-	if (t < 0.0f || t > 1.0f) return false;
-
-	// 交点
-	Vector3 p = segment.origin + dir * t;
-
-	// ここで、あなたの点が三角形の中か判定ロジックを使う！
-	// --- ここから下はあなたのロジックと同じでOK ---
-	Vector3 v01 = Subtract(v1, v0);
-	Vector3 v12 = Subtract(v2, v1);
-	Vector3 v20 = Subtract(v0, v2);
-
-	Vector3 v0p = Subtract(p, v0);
-	Vector3 v1p = Subtract(p, v1);
-	Vector3 v2p = Subtract(p, v2);
-
-	Vector3 c0 = Cross(v01, v0p);
-	Vector3 c1 = Cross(v12, v1p);
-	Vector3 c2 = Cross(v20, v2p);
-
-	if (Dot(c0, n) >= 0 && Dot(c1, n) >= 0 && Dot(c2, n) >= 0)
-		return true;
-	return false;
+	return (aabb1.min.x <= aabb2.max.x && aabb1.max.x >= aabb2.min.x) &&
+		(aabb1.min.y <= aabb2.max.y && aabb1.max.y >= aabb2.min.y) &&
+		(aabb1.min.z <= aabb2.max.z && aabb1.max.z >= aabb2.min.z);
 }
 
-void DrawTriangle(const Triangle& triangle,const Matrix4x4& viewProjectionMatrix,const Matrix4x4& viewportMatrix, uint32_t color) {
+void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
 	// 三角形の頂点をスクリーン座標に変換
 	Vector3 screenVertices[3];
 	for (int i = 0; i < 3; ++i) {
@@ -627,6 +595,30 @@ Matrix4x4 MakeLookAtMatrix(const Vector3& eye, const Vector3& target, const Vect
 	return result;
 }
 
+void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
+	Vector3 corners[8] = {
+		{ aabb.min.x, aabb.min.y, aabb.min.z },
+		{ aabb.max.x, aabb.min.y, aabb.min.z },
+		{ aabb.max.x, aabb.max.y, aabb.min.z },
+		{ aabb.min.x, aabb.max.y, aabb.min.z },
+		{ aabb.min.x, aabb.min.y, aabb.max.z },
+		{ aabb.max.x, aabb.min.y, aabb.max.z },
+		{ aabb.max.x, aabb.max.y, aabb.max.z },
+		{ aabb.min.x, aabb.max.y, aabb.max.z }
+	};
+	for (int i = 0; i < 8; ++i) {
+		corners[i] = Transform(corners[i], viewProjectionMatrix);
+		corners[i] = Transform(corners[i], viewportMatrix);
+	}
+	for (int i = 0; i < 4; ++i) {
+		int next = (i + 1) % 4;
+		int topOffset = 4;
+		Novice::DrawLine(int(corners[i].x), int(corners[i].y), int(corners[next].x), int(corners[next].y), color);
+		Novice::DrawLine(int(corners[i + topOffset].x), int(corners[i + topOffset].y), int(corners[next + topOffset].x), int(corners[next + topOffset].y), color);
+		Novice::DrawLine(int(corners[i].x), int(corners[i].y), int(corners[i + topOffset].x), int(corners[i + topOffset].y), color);
+	}
+}
+
 
 // Windowsアプリでのエントリーイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -642,9 +634,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Vector3 cameraRotate{ 0.26f,0.0f,0.0f };
 	Vector3 target{ 0.0f, 0.0f, 0.0f };
 	Vector3 up{ 0.0f, 1.0f, 0.0f };
-	Segment segment = { {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f} };
-	Triangle triangle = { {{-1.0f, 0.0f, -1.0f}, {1.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 1.0f}} };
-
+	AABB aabb1{
+		.min = {0.5f, -0.5f, -0.5f},
+		.max = {0.0f, 0.0f, 0.0f},
+	};
+	AABB aabb2{
+		.min = {0.2f, 0.2f, 0.2f},
+		.max = {1.0f, 1.0f, 1.0f},
+	};
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -668,16 +665,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 		Matrix4x4 viewportMatrix = MakeViewportMatrix(
 			0.0f, 0.0f, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
-		
 
 
-		// 線分のスクリーン座標変換
-		Vector3 start = Transform(segment.origin, viewProjectionMatrix);
-		start = Transform(start, viewportMatrix);
 
-		Vector3 end = Add(segment.origin, segment.diff);
-		end = Transform(end, viewProjectionMatrix);
-		end = Transform(end, viewportMatrix);
+		//// 線分のスクリーン座標変換
+		//Vector3 start = Transform(segment.origin, viewProjectionMatrix);
+		//start = Transform(start, viewportMatrix);
+
+		//Vector3 end = Add(segment.origin, segment.diff);
+		//end = Transform(end, viewProjectionMatrix);
+		//end = Transform(end, viewportMatrix);
 
 		///
 		/// ↑更新処理ここまで
@@ -689,30 +686,28 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		// ImGui
 		ImGui::Begin("Window");
+
+		// カメラの設定
 		ImGui::DragFloat3("cameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("cameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("triangle.v0", &triangle.vertices[0].x, 0.01f);
-		ImGui::DragFloat3("triangle.v1", &triangle.vertices[1].x, 0.01f);
-		ImGui::DragFloat3("triangle.v2", &triangle.vertices[2].x, 0.01f);
-		ImGui::DragFloat3("segment.origin", &segment.origin.x, 0.01f);
-		ImGui::DragFloat3("segment.diff", &segment.diff.x, 0.01f);
+		
+		// aabb1の設定
+		ImGui::DragFloat3("AABB1 Min", &aabb1.min.x, 0.01f);
+		ImGui::DragFloat3("AABB1 Max", &aabb1.max.x, 0.01f);
+		// aabb2の設定
+		ImGui::DragFloat3("AABB2 Min", &aabb2.min.x, 0.01f);
+		ImGui::DragFloat3("AABB2 Max", &aabb2.max.x, 0.01f);
 		ImGui::End();
 
 		// 描画
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		if(IsCollision(triangle, segment)) {
-			Novice::DrawLine(
-				int(start.x), int(start.y),
-				int(end.x), int(end.y),
-				RED);
-			DrawTriangle(triangle, viewProjectionMatrix, viewportMatrix, WHITE);
+		if (IsCollision(aabb1, aabb2)) {
+			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, RED); 
+			DrawAABB(aabb2, viewProjectionMatrix, viewportMatrix, WHITE); 
 		} else {
-			Novice::DrawLine(
-				int(start.x), int(start.y),
-				int(end.x), int(end.y),
-				WHITE);
-			DrawTriangle(triangle, viewProjectionMatrix, viewportMatrix, WHITE);
+			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, WHITE);
+			DrawAABB(aabb2, viewProjectionMatrix, viewportMatrix, WHITE);
 		}
 
 		///
