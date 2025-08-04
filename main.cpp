@@ -510,13 +510,18 @@ float Dot(const Vector3& v1, const Vector3& v2) {
 Vector3 operator*(const Vector3& v, float s) {
 	return { v.x * s, v.y * s, v.z * s };
 }
-Vector3 operator*(float s, const Vector3& v) {
-	return { v.x * s, v.y * s, v.z * s };
-}
 // 加算演算子
 Vector3 operator+(const Vector3& a, const Vector3& b) {
 	return { a.x + b.x, a.y + b.y, a.z + b.z };
 }
+// 減算演算子
+Vector3 operator-(const Vector3& a, const Vector3& b) {
+	return { a.x - b.x, a.y - b.y, a.z - b.z };
+}
+Matrix4x4 operator*(const Matrix4x4& m1, const Matrix4x4& m2) {
+	return Multiply(m1, m2);
+}
+
 
 // 正規化	
 Vector3 Normalize(const Vector3& vector) {
@@ -694,20 +699,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
-	Vector3 cameraTranslate{ 0.0f,3.0f,-10.0f };
-	Vector3 cameraRotate{ 0.26f,0.0f,0.0f };
-	Vector3 target{ 0.0f, 0.0f, 0.0f };
-	Vector3 up{ 0.0f, 1.0f, 0.0f };
-	Vector3 controlPoints[3] = {
-		{-0.8f, 0.58f, 1.0f},
-		{1.76f, 1.0f, -0.3f},
-		{0.94f, -0.7f, 2.3f},
-	};
-	Sphere sphere[3] = {
-		{0.0f, 0.0f, 0.0f, 0.01f},
-		{0.0f, 0.0f, 0.0f, 0.01f},
-		{0.0f, 0.0f, 0.0f, 0.01f}
-	};
+	Vector3 a{ 0.2f, 1.0f, 0.0f };
+	Vector3 b{ 2.4f, 3.1f, 1.2f };
+	Vector3 c = a + b;
+	Vector3 d = a - b;
+	Vector3 e = a * 2.4f;
+	Vector3 rotate{ 0.4f, 1.43f, -0.8f };
+	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
+	Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
+	Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
+	Matrix4x4 rotateMatrix = rotateXMatrix * rotateYMatrix * rotateZMatrix;
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -722,16 +723,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓更新処理ここから
 		///
 
-		Matrix4x4 cameraMatrix = MakeAffineMatrix(
-			{ 1.0f, 1.0f, 1.0f }, cameraRotate, cameraTranslate);
-		//Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-		Matrix4x4 viewMatrix = MakeLookAtMatrix(cameraTranslate, target, up);
-		Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(
-			0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
-		Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
-		Matrix4x4 viewportMatrix = MakeViewportMatrix(
-			0.0f, 0.0f, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
-
 		///
 		/// ↑更新処理ここまで
 		///
@@ -743,28 +734,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		// ImGui
 		ImGui::Begin("Window");
 
-		// カメラの設定
-		ImGui::DragFloat3("cameraTranslate", &cameraTranslate.x, 0.01f);
-		ImGui::DragFloat3("cameraRotate", &cameraRotate.x, 0.01f);
-
-		// ベジェ曲線
-		ImGui::DragFloat3("controlPoint0", &controlPoints[0].x, 0.01f);
-		ImGui::DragFloat3("controlPoint1", &controlPoints[1].x, 0.01f);
-		ImGui::DragFloat3("controlPoint2", &controlPoints[2].x, 0.01f);
+		ImGui::Text("c:%f, %f, %f", c.x, c.y, c.z);
+		ImGui::Text("d:%f, %f, %f", d.x, d.y, d.z);
+		ImGui::Text("e:%f, %f, %f", e.x, e.y, e.z);
+		ImGui::Text("matrix:\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f",
+			rotateMatrix.m[0][0], rotateMatrix.m[0][1], rotateMatrix.m[0][2],
+			rotateMatrix.m[0][3], rotateMatrix.m[1][0], rotateMatrix.m[1][1],
+			rotateMatrix.m[1][2], rotateMatrix.m[1][3], rotateMatrix.m[2][0],
+			rotateMatrix.m[2][1], rotateMatrix.m[2][2], rotateMatrix.m[2][3],
+			rotateMatrix.m[3][0], rotateMatrix.m[3][1], rotateMatrix.m[3][2],
+			rotateMatrix.m[3][3]
+			);
 
 		ImGui::End();
-
-		sphere[0].center = controlPoints[0];
-		sphere[1].center = controlPoints[1];
-		sphere[2].center = controlPoints[2];
-
-		// 描画
-		DrawGrid(viewProjectionMatrix, viewportMatrix);
-
-		DrawBezier(controlPoints[0], controlPoints[1], controlPoints[2], viewProjectionMatrix, viewportMatrix, BLUE);
-		DrawSphere(sphere[0], viewProjectionMatrix, viewportMatrix, BLACK);
-		DrawSphere(sphere[1], viewProjectionMatrix, viewportMatrix, BLACK);
-		DrawSphere(sphere[2], viewProjectionMatrix, viewportMatrix, BLACK);
 
 		///
 		/// ↑描画処理ここまで
