@@ -698,15 +698,27 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Vector3 cameraRotate{ 0.26f,0.0f,0.0f };
 	Vector3 target{ 0.0f, 0.0f, 0.0f };
 	Vector3 up{ 0.0f, 1.0f, 0.0f };
-	Vector3 controlPoints[3] = {
-		{-0.8f, 0.58f, 1.0f},
-		{1.76f, 1.0f, -0.3f},
-		{0.94f, -0.7f, 2.3f},
-	};
+	
 	Sphere sphere[3] = {
-		{0.0f, 0.0f, 0.0f, 0.01f},
-		{0.0f, 0.0f, 0.0f, 0.01f},
-		{0.0f, 0.0f, 0.0f, 0.01f}
+		{0.0f, 0.0f, 0.0f, 0.1f},
+		{0.0f, 0.0f, 0.0f, 0.1f},
+		{0.0f, 0.0f, 0.0f, 0.1f}
+	};
+
+	Vector3 translates[3] = {
+		{0.2f, 1.0f, 0.0f},
+		{0.4f, 0.0f, 0.0f},
+		{0.3f, 0.0f, 0.0f},
+	};
+	Vector3 rotates[3] = {
+		{0.0f, 0.0f, -6.8f},
+		{0.0f, 0.0f, -1.4f},
+		{0.0f, 0.0f, 0.0f},
+	};
+	Vector3 scales[3] = {
+		{1.0f, 1.0f, 1.0f},
+		{1.0f, 1.0f, 1.0f},
+		{1.0f, 1.0f, 1.0f},
 	};
 
 	// ウィンドウの×ボタンが押されるまでループ
@@ -732,6 +744,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Matrix4x4 viewportMatrix = MakeViewportMatrix(
 			0.0f, 0.0f, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
+		// 肩
+		Matrix4x4 shoulderWorld = MakeAffineMatrix(scales[0], rotates[0], translates[0]);
+
+		// 肘
+		Matrix4x4 elbowLocal = MakeAffineMatrix(scales[1], rotates[1], translates[1]);
+		Matrix4x4 elbowWorld = Multiply(elbowLocal, shoulderWorld);
+
+		// 手首
+		Matrix4x4 handLocal = MakeAffineMatrix(scales[2], rotates[2], translates[2]);
+		Matrix4x4 handWorld = Multiply(handLocal, elbowWorld);
+
 		///
 		/// ↑更新処理ここまで
 		///
@@ -747,24 +770,55 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::DragFloat3("cameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("cameraRotate", &cameraRotate.x, 0.01f);
 
-		// ベジェ曲線
-		ImGui::DragFloat3("controlPoint0", &controlPoints[0].x, 0.01f);
-		ImGui::DragFloat3("controlPoint1", &controlPoints[1].x, 0.01f);
-		ImGui::DragFloat3("controlPoint2", &controlPoints[2].x, 0.01f);
+		ImGui::DragFloat3("translates[0]", &translates[0].x);
+		ImGui::DragFloat3("rotates[0]", &rotates[0].x);
+		ImGui::DragFloat3("scales[0]", &scales[0].x);
+		ImGui::DragFloat3("translates[1]", &translates[1].x);
+		ImGui::DragFloat3("rotates[1]", &rotates[1].x);
+		ImGui::DragFloat3("scales[1]", &scales[1].x);
+		ImGui::DragFloat3("translates[2]", &translates[2].x);
+		ImGui::DragFloat3("rotates[2]", &rotates[2].x);
+		ImGui::DragFloat3("scales[2]", &scales[2].x);
 
 		ImGui::End();
 
-		sphere[0].center = controlPoints[0];
-		sphere[1].center = controlPoints[1];
-		sphere[2].center = controlPoints[2];
+		sphere[0].center = Transform({0,0,0}, shoulderWorld);
+		sphere[1].center = Transform({ 0,0,0 }, elbowWorld);
+		sphere[2].center = Transform({ 0,0,0 }, handWorld);
 
 		// 描画
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		DrawBezier(controlPoints[0], controlPoints[1], controlPoints[2], viewProjectionMatrix, viewportMatrix, BLUE);
-		DrawSphere(sphere[0], viewProjectionMatrix, viewportMatrix, BLACK);
-		DrawSphere(sphere[1], viewProjectionMatrix, viewportMatrix, BLACK);
-		DrawSphere(sphere[2], viewProjectionMatrix, viewportMatrix, BLACK);
+		// --- 各ノードのワールド座標 ---
+		sphere[0].center = Transform({ 0,0,0 }, shoulderWorld);
+		sphere[1].center = Transform({ 0,0,0 }, elbowWorld);
+		sphere[2].center = Transform({ 0,0,0 }, handWorld);
+
+		// --- スクリーン座標変換 ---
+		Vector3 screenShoulder = Transform(sphere[0].center, viewProjectionMatrix);
+		screenShoulder = Transform(screenShoulder, viewportMatrix);
+
+		Vector3 screenElbow = Transform(sphere[1].center, viewProjectionMatrix);
+		screenElbow = Transform(screenElbow, viewportMatrix);
+
+		Vector3 screenHand = Transform(sphere[2].center, viewProjectionMatrix);
+		screenHand = Transform(screenHand, viewportMatrix);
+
+		// --- 線でつなぐ ---
+		Novice::DrawLine(
+			static_cast<int>(screenShoulder.x), static_cast<int>(screenShoulder.y),
+			static_cast<int>(screenElbow.x), static_cast<int>(screenElbow.y),
+			WHITE);
+		Novice::DrawLine(
+			static_cast<int>(screenElbow.x), static_cast<int>(screenElbow.y),
+			static_cast<int>(screenHand.x), static_cast<int>(screenHand.y),
+			WHITE);
+
+
+
+		DrawSphere(sphere[0], viewProjectionMatrix, viewportMatrix, RED);
+		DrawSphere(sphere[1], viewProjectionMatrix, viewportMatrix, GREEN);
+		DrawSphere(sphere[2], viewProjectionMatrix, viewportMatrix, BLUE);
 
 		///
 		/// ↑描画処理ここまで
